@@ -3,7 +3,6 @@
 const spawn = require('cross-spawn')
 const npmRunPath = require('npm-run-path-compat')
 const log = require('npmlog')
-const versionChanged = require('version-changed')
 const version = require('./package').version
 const runSeries = require('run-series')
 const supportedTargets = require('node-abi').supportedTargets
@@ -20,6 +19,25 @@ const token = process.env.PREBUILD_TOKEN
 if (!token) {
   log.error('PREBUILD_TOKEN required')
   process.exit(0)
+}
+
+const exec = require('child_process').exec
+
+const getPackageVersion = (rev, cb) => {
+  exec(`git show ${rev}:./package.json`, {
+    encoding: 'utf8'
+  }, (err, diff) => {
+    cb(err, diff && JSON.parse(diff).version)
+  })
+}
+
+const versionChanged = cb => {
+  getPackageVersion('HEAD', (err, head) => {
+    if (err) return cb(err)
+    getPackageVersion('HEAD~1', (err, prev) => {
+      cb(err, head && prev && head !== prev)
+    })
+  })
 }
 
 function prebuild (runtime, target, cb) {
